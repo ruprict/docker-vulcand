@@ -1,0 +1,49 @@
+version: "2"
+networks:
+  vulcand:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.24.0.0/24
+services:
+  etcd0:
+    image: quay.io/coreos/etcd:latest
+    networks:
+      vulcand:
+        ipv4_address: 172.24.0.4
+    ports:
+      - 4001:4001
+      - 2379:2379
+      - 2380:2380
+    volumes:
+      - ./etcd/etcd0:/data
+    environment:
+      - ETCD_NAME=etcd0
+      - ETCD_ADVERTISE_CLIENT_URLS=http://0.0.0.0:2379,http://0.0.0.0:4001
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379,http://0.0.0.0:4001
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://172.24.0.4:2380
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster-1
+      - ETCD_INITIAL_CLUSTER=etcd0=http://172.24.0.4:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_DATA_DIR=/data
+  vulcand:
+    image: mailgun/vulcand:v0.8.0-beta.3
+    links:
+      - etcd0
+      - test_server
+    networks:
+      vulcand:
+        ipv4_address: 172.24.0.2
+    ports:
+      - 8181:8181
+      - 8182:8182
+    command: ["/go/bin/vulcand","--etcd","http://etcd0:4001", "-sealKey", "e2eebb2f2eb02180c391ac53f5d71edbf2bf49c7112f4a54e7c4797fb1eb92c4"]
+  test_server:
+    image: jamesdbloom/mockserver
+    networks:
+      vulcand:
+        ipv4_address: 172.24.0.3
+    ports:
+      - 1080:1080
+      - 9090:9090
